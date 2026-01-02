@@ -1,8 +1,12 @@
 import json
 import os
 from datetime import datetime
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, make_response
 from supabase import create_client, Client
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -10,7 +14,13 @@ app = Flask(__name__)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+supabase: Client = None
+
+# Initialize Supabase client only if credentials are available
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+else:
+    print("Warning: SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY not set in environment variables")
 
 def calculate_level_and_xp(completed_tasks_count):
     """Calculate XP and Level based on completed tasks"""
@@ -49,6 +59,9 @@ def after_request(response):
 @app.route('/api/tasks', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 def tasks():
     """Handle all task operations"""
+    if not supabase:
+        return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."}), 500
+    
     try:
         if request.method == 'GET':
             response = supabase.table("tasks").select("*").execute()
@@ -138,3 +151,6 @@ def index():
 @app.route('/api', methods=['GET', 'OPTIONS'])
 def api_index():
     return jsonify({"message": "Task Manager API"})
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=5000)
