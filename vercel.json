@@ -2,9 +2,7 @@
   "buildCommand": "pip install -r api/requirements.txt",
   "outputDirectory": ".",
   "functions": {
-    "api/index.py": {
-      "runtime": "python@3.11"
-    }
+    "api/index.py": {}
   },
   "routes": [
     {
