@@ -1,20 +1,10 @@
 import json
 import os
 from datetime import datetime
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify, make_response
 from supabase import create_client, Client
 
 app = Flask(__name__)
-
-# Configure CORS to allow all origins
-CORS(app, resources={
-    r"/api/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-})
 
 # Initialize Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -27,6 +17,34 @@ def calculate_level_and_xp(completed_tasks_count):
     xp = completed_tasks_count * 10
     level = (xp // 50) + 1
     return xp, level
+
+def add_cors_headers(response):
+    """Add CORS headers to response"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
+
+@app.before_request
+def handle_preflight():
+    """Handle CORS preflight requests"""
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Max-Age'] = '3600'
+        return response, 200
+
+@app.after_request
+def after_request(response):
+    """Add CORS headers after every request"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
 
 @app.route('/api/tasks', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 def tasks():
@@ -113,10 +131,10 @@ def tasks():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET', 'OPTIONS'])
 def index():
     return jsonify({"message": "Task Manager API"})
 
-@app.route('/api', methods=['GET'])
+@app.route('/api', methods=['GET', 'OPTIONS'])
 def api_index():
     return jsonify({"message": "Task Manager API"})
