@@ -1,7 +1,20 @@
 import json
 import os
 from datetime import datetime
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from supabase import create_client, Client
+
+app = Flask(__name__)
+
+# Configure CORS to allow all origins
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Initialize Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -15,161 +28,95 @@ def calculate_level_and_xp(completed_tasks_count):
     level = (xp // 50) + 1
     return xp, level
 
-def get_tasks():
-    """GET /api/tasks - Fetch all tasks with XP and Level"""
+@app.route('/api/tasks', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+def tasks():
+    """Handle all task operations"""
     try:
-        response = supabase.table("tasks").select("*").execute()
-        tasks = response.data
-        
-        # Count completed tasks
-        completed_count = sum(1 for task in tasks if task["completed"])
-        xp, level = calculate_level_and_xp(completed_count)
-        
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
-                "tasks": tasks,
+        if request.method == 'GET':
+            response = supabase.table("tasks").select("*").execute()
+            tasks_list = response.data
+            
+            # Count completed tasks
+            completed_count = sum(1 for task in tasks_list if task.get("completed", False))
+            xp, level = calculate_level_and_xp(completed_count)
+            
+            return jsonify({
+                "tasks": tasks_list,
                 "xp": xp,
                 "level": level
             })
-        }
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
-
-def create_task(title):
-    """POST /api/tasks - Create a new task"""
-    try:
-        new_task = {
-            "title": title,
-            "completed": False,
-            "created_at": datetime.utcnow().isoformat()
-        }
         
-        response = supabase.table("tasks").insert(new_task).execute()
-        
-        # Recalculate stats
-        all_tasks = supabase.table("tasks").select("*").execute().data
-        completed_count = sum(1 for task in all_tasks if task["completed"])
-        xp, level = calculate_level_and_xp(completed_count)
-        
-        return {
-            "statusCode": 201,
-            "body": json.dumps({
+        elif request.method == 'POST':
+            data = request.get_json() or {}
+            title = data.get("title", "Untitled")
+            
+            new_task = {
+                "title": title,
+                "completed": False,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = supabase.table("tasks").insert(new_task).execute()
+            
+            # Recalculate stats
+            all_tasks = supabase.table("tasks").select("*").execute().data
+            completed_count = sum(1 for task in all_tasks if task.get("completed", False))
+            xp, level = calculate_level_and_xp(completed_count)
+            
+            return jsonify({
                 "task": response.data[0] if response.data else new_task,
                 "xp": xp,
                 "level": level
-            })
-        }
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
-
-def update_task(task_id, title, completed):
-    """PUT /api/tasks - Update a task"""
-    try:
-        update_data = {
-            "title": title,
-            "completed": completed
-        }
+            }), 201
         
-        response = supabase.table("tasks").update(update_data).eq("id", task_id).execute()
-        
-        # Recalculate stats
-        all_tasks = supabase.table("tasks").select("*").execute().data
-        completed_count = sum(1 for task in all_tasks if task["completed"])
-        xp, level = calculate_level_and_xp(completed_count)
-        
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
+        elif request.method == 'PUT':
+            data = request.get_json() or {}
+            task_id = data.get("id")
+            title = data.get("title")
+            completed = data.get("completed")
+            
+            update_data = {
+                "title": title,
+                "completed": completed
+            }
+            
+            response = supabase.table("tasks").update(update_data).eq("id", task_id).execute()
+            
+            # Recalculate stats
+            all_tasks = supabase.table("tasks").select("*").execute().data
+            completed_count = sum(1 for task in all_tasks if task.get("completed", False))
+            xp, level = calculate_level_and_xp(completed_count)
+            
+            return jsonify({
                 "task": response.data[0] if response.data else None,
                 "xp": xp,
                 "level": level
             })
-        }
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
-
-def delete_task(task_id):
-    """DELETE /api/tasks - Delete a task"""
-    try:
-        supabase.table("tasks").delete().eq("id", task_id).execute()
         
-        # Recalculate stats
-        all_tasks = supabase.table("tasks").select("*").execute().data
-        completed_count = sum(1 for task in all_tasks if task["completed"])
-        xp, level = calculate_level_and_xp(completed_count)
-        
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
+        elif request.method == 'DELETE':
+            task_id = request.args.get("id") or (request.get_json() or {}).get("id")
+            
+            if task_id:
+                supabase.table("tasks").delete().eq("id", task_id).execute()
+            
+            # Recalculate stats
+            all_tasks = supabase.table("tasks").select("*").execute().data
+            completed_count = sum(1 for task in all_tasks if task.get("completed", False))
+            xp, level = calculate_level_and_xp(completed_count)
+            
+            return jsonify({
                 "success": True,
                 "xp": xp,
                 "level": level
             })
-        }
+    
     except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
+        return jsonify({"error": str(e)}), 500
 
-def handler(request):
-    """Main Vercel serverless handler"""
-    method = request.method
-    path = request.path
-    
-    # Enable CORS
-    headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Content-Type": "application/json"
-    }
-    
-    if method == "OPTIONS":
-        return {
-            "statusCode": 200,
-            "headers": headers,
-            "body": ""
-        }
-    
-    try:
-        if path == "/api/tasks" or path == "/api/tasks/":
-            if method == "GET":
-                response = get_tasks()
-            elif method == "POST":
-                body = json.loads(request.body or "{}")
-                title = body.get("title", "Untitled")
-                response = create_task(title)
-            elif method == "PUT":
-                body = json.loads(request.body or "{}")
-                response = update_task(
-                    body.get("id"),
-                    body.get("title"),
-                    body.get("completed")
-                )
-            elif method == "DELETE":
-                task_id = request.args.get("id")
-                response = delete_task(task_id)
-            else:
-                response = {"statusCode": 405, "body": json.dumps({"error": "Method not allowed"})}
-        else:
-            response = {"statusCode": 404, "body": json.dumps({"error": "Not found"})}
-        
-        response["headers"] = headers
-        return response
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "headers": headers,
-            "body": json.dumps({"error": str(e)})
-        }
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({"message": "Task Manager API"})
+
+@app.route('/api', methods=['GET'])
+def api_index():
+    return jsonify({"message": "Task Manager API"})
