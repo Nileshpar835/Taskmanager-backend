@@ -3,7 +3,7 @@
   "outputDirectory": ".",
   "routes": [
     {
-      "src": "/api/(.*)",
+      "src": "/(.*)",
       "dest": "/api/index.py"
     }
   ]
