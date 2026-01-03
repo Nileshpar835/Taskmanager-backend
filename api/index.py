@@ -59,6 +59,9 @@ def after_request(response):
 @app.route('/api/tasks', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 def tasks():
     """Handle all task operations"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     if not supabase:
         return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."}), 500
     
