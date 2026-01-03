@@ -123,11 +123,11 @@ def tasks():
 
 @app.route('/', methods=['GET', 'OPTIONS'])
 def index():
-    return jsonify({"message": "Task Manager API"})
+    return jsonify({"message": "Task Manager API", "status": "running"}), 200
 
 @app.route('/api', methods=['GET', 'OPTIONS'])
 def api_index():
-    return jsonify({"message": "Task Manager API"})
+    return jsonify({"message": "Task Manager API", "status": "running"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
