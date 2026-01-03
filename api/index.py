@@ -3,12 +3,16 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, make_response
+from flask_cors import CORS
 from supabase import create_client, Client
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
+
+# Enable CORS for all routes
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}}, supports_credentials=False)
 
 # Initialize Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -28,39 +32,9 @@ def calculate_level_and_xp(completed_tasks_count):
     level = (xp // 50) + 1
     return xp, level
 
-def add_cors_headers(response):
-    """Add CORS headers to response"""
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    response.headers['Access-Control-Max-Age'] = '3600'
-    return response
-
-@app.before_request
-def handle_preflight():
-    """Handle CORS preflight requests"""
-    if request.method == "OPTIONS":
-        response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response.headers['Access-Control-Max-Age'] = '3600'
-        return response, 200
-
-@app.after_request
-def after_request(response):
-    """Add CORS headers after every request"""
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    response.headers['Access-Control-Max-Age'] = '3600'
-    return response
-
 @app.route('/api/tasks', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 def tasks():
     """Handle all task operations"""
-    if request.method == 'OPTIONS':
-        return '', 200
     
     if not supabase:
         return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."}), 500
